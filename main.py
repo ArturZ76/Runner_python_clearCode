@@ -1,5 +1,6 @@
 import pygame
 from sys import exit
+from random import randint
 
 def display_score():
     current_time = int(pygame.time.get_ticks() / 1000) - start_time
@@ -7,6 +8,37 @@ def display_score():
     score_rect = score_surf.get_rect(center = (400, 50))
     screen.blit(score_surf, score_rect)
     return current_time
+
+def obsticle_movement(obsticle_list):
+    if obsticle_list:
+        for obsticle_rect in obsticle_list:
+            obsticle_rect.x -= 4
+
+            if obsticle_rect.bottom == 300:
+                screen.blit(snail_surf, obsticle_rect)
+            else:
+                screen.blit(fly_surf, obsticle_rect)
+
+        obsticle_list = [obsticle for obsticle in obsticle_list if obsticle.x > -100]
+
+        return obsticle_list
+    else: return []
+
+def collisions(player, obsticles):
+    if obsticles:
+        for obsticle_rect in obsticles:
+            if player.colliderect(obsticle_rect): return False
+    return True
+
+def player_animation():
+    global player_surface, player_index
+
+    if player_rect.bottom < 300:
+        player_surface = player_jump
+    else:
+        player_index += 0.07
+        if player_index >= len(player_walk): player_index = 0
+        player_surface = player_walk[int(player_index)]
 
 pygame.init()
 screen = pygame.display.set_mode((800, 400))
@@ -23,11 +55,29 @@ ground_surface = pygame.image.load('graphics/ground.png').convert()
 # score_surf = test_font.render("My game", False, (64,64,64))
 # score_rect = score_surf.get_rect(center = (400, 50))
 
-snail_surface = pygame.image.load("graphics/snail/snail1.png").convert_alpha()
-snail_x_pos = 800
-snail_rect = snail_surface.get_rect(midbottom = (snail_x_pos, 300) )
+#snail
+snail_frame1 = pygame.image.load("graphics/snail/snail1.png").convert_alpha()
+snail_frame2 = pygame.image.load("graphics/snail/snail2.png").convert_alpha()
+snail_frames = [snail_frame1, snail_frame2]
+snail_frame_index = 0
+snail_surf = snail_frames[snail_frame_index]
 
-player_surface = pygame.image.load("graphics/Player/player_walk_1.png").convert_alpha()
+#fly
+fly_frame1 = pygame.image.load("graphics/fly/fly1.png").convert_alpha()
+fly_frame2 = pygame.image.load("graphics/fly/fly2.png").convert_alpha()
+fly_frames = [fly_frame1, fly_frame2]
+fly_frame_index = 0
+fly_surf = fly_frames[fly_frame_index]
+
+obsticle_rect_list = []
+
+player_walk_1 = pygame.image.load("graphics/Player/player_walk_1.png").convert_alpha()
+player_walk_2 = pygame.image.load("graphics/Player/player_walk_2.png").convert_alpha()
+player_walk = [player_walk_1, player_walk_2]
+player_index = 0
+player_jump = pygame.image.load("graphics/Player/jump.png").convert_alpha()
+
+player_surface = player_walk[player_index]
 player_rect = player_surface.get_rect(bottomright = ( 80, 300 ))
 player_gravity = 0
 
@@ -41,6 +91,17 @@ game_name_rect = game_name.get_rect(center = (400, 80))
 
 game_instructions = test_font.render('Press Space To Start', False, (111, 196, 169))
 game_instructions_rect = game_instructions.get_rect(center = (400, 360))
+
+#Timer
+obsticle_timer = pygame.USEREVENT + 1
+pygame.time.set_timer(obsticle_timer, 1500)
+
+snail_animation_timer = pygame.USEREVENT + 2
+pygame.time.set_timer(snail_animation_timer, 500)
+
+fly_animation_timer = pygame.USEREVENT + 3
+pygame.time.set_timer(fly_animation_timer, 200)
+
 
 while True:
     for event in pygame.event.get():
@@ -58,8 +119,24 @@ while True:
         else:
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 game_active = True
-                snail_rect.left = 800
                 start_time = int(pygame.time.get_ticks() / 1000)
+
+        if game_active:
+            if event.type == obsticle_timer:
+                if randint(0, 2):
+                    obsticle_rect_list.append(snail_surf.get_rect(midbottom = (randint(900, 1100), 300)))
+                else:
+                    obsticle_rect_list.append(fly_surf.get_rect(midbottom = (randint(900, 1100), 210)))
+
+            if event.type == snail_animation_timer:
+                if snail_frame_index == 0: snail_frame_index = 1
+                else: snail_frame_index = 0
+                snail_surf = snail_frames[snail_frame_index]
+
+            if event.type == fly_animation_timer:
+                if fly_frame_index == 0: fly_frame_index = 1
+                else: fly_frame_index = 0 
+                fly_surf = fly_frames[fly_frame_index]
 
     if game_active:
         screen.blit(sky_surface, (0, 0))    #(blit)block image transfer
@@ -69,24 +146,31 @@ while True:
         # screen.blit(score_surf, score_rect)
         score = display_score()
 
-        if snail_rect.right <= 0:
-            snail_rect.left = 800
-        screen.blit(snail_surface, snail_rect)
-        snail_rect.right -= 5
+        # if snail_rect.right <= 0:
+        #     snail_rect.left = 800
+        # screen.blit(snail_surface, snail_rect)
+        # snail_rect.right -= 5
 
         #Player
         player_gravity += 1
         player_rect.y += player_gravity
         if player_rect.bottom >= 300:
             player_rect.bottom = 300
+        player_animation()
         screen.blit(player_surface, player_rect)
 
+        # obsticle movement
+        obsticle_rect_list = obsticle_movement(obsticle_rect_list)
+
         #collision
-        if snail_rect.colliderect(player_rect):
-            game_active = False
+        game_active = collisions(player_rect, obsticle_rect_list)
     else:
         screen.fill((94,129,162 ))
         screen.blit(player_stand, player_stand_rect)
+        obsticle_rect_list.clear()
+        player_rect.midbottom = (80, 300)
+        player_gravity = 0
+
         score_message = test_font.render(f'Your score: {score}', False, (111, 196, 169))
         score_message_rect = score_message.get_rect(center = (400, 330))
         screen.blit(game_name, game_name_rect)
